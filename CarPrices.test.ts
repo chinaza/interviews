@@ -36,9 +36,10 @@ it('should use cache for second request', async () => {
 it('should detect an in-flight request and call get external price only once', async () => {
   const carPrices = new CarPrices(cache);
 
-  const req1 = carPrices.getPrice('SG70 SAM', false);
-  const req2 = carPrices.getPrice('SG70 SAM', false);
-  await Promise.all([req1, req2]);
+  const requests = Array(100)
+    .fill(0)
+    .map(() => carPrices.getPrice('SG70 SAM', false));
+  await Promise.all(requests);
   expect(getExternalPrice).toHaveBeenCalledTimes(1);
 });
 
