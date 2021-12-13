@@ -10,7 +10,12 @@ export default class RedisCache implements Cache {
     this.client = new Redis(port, host, {
       password,
     });
-    this.redLock = new Redlock([this.client]);
+    this.redLock = new Redlock([this.client], {
+      retryCount: 120,
+
+      // the time in ms between attempts
+      retryDelay: 1000,
+    });
     this.lock = {};
   }
 
