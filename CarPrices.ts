@@ -3,14 +3,21 @@ import eventEmitter from './Event';
 import { getExternalPrice } from './ExternalPrice';
 
 export default class CarPrices {
+  private listeners = new Map<string, Promise<number>>();
+
   constructor(private cache: Cache) {}
 
   private priceResponseListener = async (plate: string): Promise<number> => {
-    return new Promise((resolve) => {
+    if (this.listeners.has(plate)) return this.listeners.get(plate)!;
+
+    const listener: Promise<number> = new Promise((resolve) => {
       eventEmitter.once(`plate:${plate}`, (price: number) => {
         return resolve(price);
       });
     });
+    this.listeners.set(plate, listener);
+
+    return listener;
   };
 
   private async fetchExternalPrice(numberPlate: string): Promise<number> {
