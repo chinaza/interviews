@@ -2,6 +2,7 @@
 
 ## Setup
 
+- Create a .env file and specify parameters as seen in .env.example for your redis instance
 - Run `yarn` or `npm install`
 
 ## Test
