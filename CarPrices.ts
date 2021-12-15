@@ -1,35 +1,20 @@
 import Cache from './Cache';
-import eventEmitter from './Event';
 import { getExternalPrice } from './ExternalPrice';
 
 export default class CarPrices {
-  private listeners = new Map<string, Promise<number>>();
-
   constructor(private cache: Cache) {}
 
-  private priceResponseListener = async (plate: string): Promise<number> => {
-    if (this.listeners.has(plate)) return this.listeners.get(plate)!;
-
-    const listener: Promise<number> = new Promise((resolve) => {
-      eventEmitter.once(`plate:${plate}`, (price: number) => {
-        return resolve(price);
-      });
-    });
-    this.listeners.set(plate, listener);
-
-    return listener;
-  };
-
   private async fetchExternalPrice(numberPlate: string): Promise<number> {
-    // Update price fetch status in cache and release lock
-    await this.cache.setPrice(numberPlate, 'FETCHING');
-    await this.cache.manageLock(numberPlate, 'release');
+    try {
+      const price = await getExternalPrice(numberPlate);
+      await this.cache.setPrice(numberPlate, 'FETCHED', price);
+      await this.cache.manageLock(numberPlate, 'release');
 
-    const price = await getExternalPrice(numberPlate);
-    await this.cache.setPrice(numberPlate, 'FETCHED', price);
-    // Fire price event to notify listeners
-    eventEmitter.emit(`plate:${numberPlate}`, price);
-    return price;
+      return price;
+    } catch (error) {
+      console.error(error);
+      return 0;
+    }
   }
 
   public async getPrice(
@@ -38,6 +23,7 @@ export default class CarPrices {
   ): Promise<number> {
     // Acquire lock and Check if price is in cache
     await this.cache.manageLock(numberPlate, 'acquire');
+
     const cachedValue = await this.cache.getPrice(numberPlate);
 
     if (
@@ -48,13 +34,6 @@ export default class CarPrices {
       // Release lock if price in cache
       await this.cache.manageLock(numberPlate, 'release');
       return cachedValue.price;
-    }
-
-    if (cachedValue?.state === 'FETCHING') {
-      // Release lock if cache in fetching state
-      await this.cache.manageLock(numberPlate, 'release');
-      const resolvedPrice = await this.priceResponseListener(numberPlate);
-      return resolvedPrice;
     }
 
     const price = await this.fetchExternalPrice(numberPlate);

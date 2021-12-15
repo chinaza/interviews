@@ -2,6 +2,7 @@ import Redis from 'ioredis';
 import Redlock, { Lock } from 'redlock';
 import Cache, { State } from './Cache';
 
+const LOCK_TTL = 600000;
 export default class RedisCache implements Cache {
   private client;
   private redLock: Redlock;
@@ -27,9 +28,10 @@ export default class RedisCache implements Cache {
     const key = `lock:${plate}`;
 
     if (this.lock[key] && op === 'release') {
-      await this.lock[key].release();
+      const expiration = this.lock[key].expiration;
+      if (expiration - Date.now() > 0) await this.lock[key].release();
     } else if (op === 'acquire') {
-      const lock = await this.redLock.acquire([key], 5000);
+      const lock = await this.redLock.acquire([key], LOCK_TTL);
       this.lock[key] = lock;
     }
   }
